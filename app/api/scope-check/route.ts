@@ -21,10 +21,9 @@ function isScopeCheckPayload(value: unknown): value is ScopeCheckPayload {
 }
 
 export async function POST(request: Request) {
-  if (process.env.NODE_ENV === "production") {
-    return Response.json({ error: "The demo scope checker is only available during development." }, { status: 404 });
+  if (process.env.NODE_ENV !== "production" && !isLocalDemoRequest(request)) {
+    return Response.json({ error: "Local demo endpoint only." }, { status: 403 });
   }
-  if (!isLocalDemoRequest(request)) return Response.json({ error: "Local demo endpoint only." }, { status: 403 });
 
   const contentLength = Number(request.headers.get("content-length") ?? 0);
   if (contentLength > 32_000) {

@@ -17,6 +17,7 @@ type WalletSessionContextValue = {
 };
 
 const WalletSessionContext = createContext<WalletSessionContextValue | null>(null);
+const isPublicPreview = process.env.NODE_ENV === "production";
 
 export function WalletSessionProvider({ children }: PropsWithChildren) {
   const client = useAppClient();
@@ -31,6 +32,12 @@ export function WalletSessionProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
+    if (isPublicPreview) {
+      setSession(null);
+      setIsChecking(false);
+      return () => { active = false; };
+    }
+
     setIsChecking(true);
     fetch("/api/auth/session", { cache: "no-store" })
       .then(async (response) => {

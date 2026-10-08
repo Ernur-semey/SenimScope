@@ -1,4 +1,4 @@
-import { isDemoProject } from "@/app/lib/project-types";
+import { createSeedProject, isDemoProject } from "@/app/lib/project-types";
 import { isLocalDemoRequest } from "@/app/lib/local-demo-security";
 import { getWalletSessionForRequest } from "@/app/lib/local-wallet-auth";
 import { loadProject, saveProject } from "@/app/lib/local-project-store";
@@ -12,6 +12,10 @@ function demoOnly() {
 }
 
 export async function GET(request: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return Response.json(createSeedProject(), { headers: { "Cache-Control": "no-store" } });
+  }
+
   const unavailable = demoOnly();
   if (unavailable) return unavailable;
   if (!isLocalDemoRequest(request)) return Response.json({ error: "Local demo endpoint only." }, { status: 403 });

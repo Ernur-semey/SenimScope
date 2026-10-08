@@ -4,6 +4,8 @@
 
 [Product brief](docs/PRODUCT_SPEC.md) · [Architecture](docs/ARCHITECTURE.md) · [Brand guide](brand.md)
 
+**Live deployment:** [senimscope.vercel.app](https://senimscope.vercel.app) · [View on Vercel](https://vercel.com/ernur5/senimscope/FCzBZCaUwKsZvKqvArrY5kJenrV6)
+
 ---
 
 ## The Problem
@@ -82,7 +84,7 @@ The local project snapshot is stored in `.local-data/senimscope-demo.json`, whic
 
 ## Run Locally
 
-**Requirements:** Node.js 24+ and pnpm.
+**Requirements:** Node.js 24.x and pnpm 11.25.0.
 
 ```bash
 git clone https://github.com/Ernur-semey/SenimScope.git
@@ -99,7 +101,11 @@ To create a production build locally:
 pnpm build
 ```
 
-The local demo API is intentionally unavailable in production mode; this prototype is not ready for multi-user or production use.
+### Vercel preview
+
+The app can be deployed as a public, interactive demo without environment variables. In production preview mode it loads a fixed sample project; checklist, acceptance, and change-request edits stay in the current browser session and reset after a refresh. Scope-check messages are sent to the app's API for deterministic comparison and are not stored. Do not submit private client correspondence.
+
+This preview has no production authentication, project roles, shared database, or on-chain transactions. It is suitable for a hackathon demo, not for real customer projects. See [Vercel deployment notes](docs/VERCEL_DEPLOYMENT.md).
 
 ---
 

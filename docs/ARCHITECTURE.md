@@ -2,7 +2,9 @@
 
 ## Current prototype
 
-The Next.js client UI loads one demo project through a local Route Handler. The handler persists state atomically in `.local-data/senimscope-demo.json`, which is ignored by Git. Checklist changes, milestone acceptance, dismissed suggestions, incoming sample text, change-request drafts, and a short activity history survive refresh. Mutations require a locally verified wallet-signature session. Sessions are stored in server memory for up to eight hours and are lost when the development server restarts. This proves control of an address but does not assign or check project roles. Route Handlers are disabled in production; this remains a single-machine development adapter, not shared storage or production authentication.
+In local development, the Next.js client UI loads one demo project through a Route Handler that persists state atomically in `.local-data/senimscope-demo.json`, which is ignored by Git. Checklist changes, milestone acceptance, dismissed suggestions, incoming sample text, change-request drafts, and a short activity history survive refresh. Mutations require a locally verified wallet-signature session. Sessions are stored in server memory for up to eight hours and are lost when the development server restarts. This proves control of an address but does not assign or check project roles.
+
+Production deployments use a public preview mode: `GET /api/project` returns the bundled seed project, the deterministic scope checker runs without persistence, and UI changes live only in browser memory. Authentication, session routes, and project writes remain disabled. This mode is suitable for a hackathon demo, not real customer data or multi-user operation.
 
 The scope checker is a deterministic rules demo (`rules-demo-v1`) that returns `possible_change`, `likely_in_scope`, or `uncertain`, with excerpts and references to matching scope items. It is not an LLM, and its result cannot change scope or approve a milestone by itself. The wallet connects to devnet, but the UI submits no transactions. There is no shared database, role-based project authorization, deployed program, or escrow.
 
@@ -30,7 +32,7 @@ Next.js web app
 - `PUT /api/project` validates and atomically replaces the local JSON snapshot.
 - `POST /api/auth/challenge` issues a short-lived, one-time sign-in message; `POST /api/auth/verify` checks its wallet signature and sets an HttpOnly session cookie; `GET/DELETE /api/auth/session` reads or clears the session.
 - `/api/scope-check` runs the deterministic demo classifier with request excerpts and scope-item evidence.
-- Local routes return no-store responses and are disabled in production. Project mutations require a valid session, but the app does not yet associate wallet addresses with client/freelancer roles. Do not use this adapter for multiple users or sensitive customer data.
+- The local `GET/PUT /api/project` and wallet session routes operate only in development; local project mutations require a valid session, but the app does not yet associate addresses with client/freelancer roles. In production, GET serves the sample project, scope-check is stateless, and write/auth routes are disabled. Do not use this adapter for multiple users or sensitive customer data.
 
 ### Shared API and storage (next)
 

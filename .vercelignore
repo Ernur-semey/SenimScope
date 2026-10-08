@@ -1,0 +1,8 @@
+.brand-preview/
+.local-data/
+.superstack/
+.vercel-cli-tmp/
+AGENTS.md
+CLAUDE.md
+brand.md
+docs/

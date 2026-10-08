@@ -9,6 +9,7 @@ import type { ScopeAssessment } from "./lib/scope-analysis";
 import { useWalletSession } from "./lib/wallet-session-context";
 
 type SaveState = "loading" | "saving" | "saved" | "error";
+const isPublicPreview = process.env.NODE_ENV === "production";
 
 function addActivity(project: DemoProject, actor: string, action: string): DemoProject["activity"] {
   return [{ id: `activity-${crypto.randomUUID()}`, actor, action, dateLabel: "сейчас" }, ...project.activity].slice(0, 12);
@@ -34,6 +35,7 @@ export default function Home() {
   const writeQueue = useRef<Promise<void>>(Promise.resolve());
   const saveRevision = useRef(0);
   const { authenticatedAddress, isAuthenticated } = useWalletSession();
+  const canEdit = isPublicPreview || isAuthenticated;
   const doneCount = project.criteria.filter((criterion) => criterion.checked).length;
 
   useEffect(() => {
@@ -52,7 +54,7 @@ export default function Home() {
       } catch {
         if (!active) return;
         setSaveState("error");
-        setAnalysisError("Локальный API недоступен. Запустите проект командой pnpm dev.");
+        setAnalysisError(isPublicPreview ? "Не удалось загрузить демо-проект. Обновите страницу и попробуйте снова." : "Локальный API недоступен. Запустите проект командой pnpm dev.");
       }
     }
 
@@ -68,6 +70,11 @@ export default function Home() {
   }
 
   function persist(nextProject: DemoProject) {
+    if (isPublicPreview) {
+      setProject(nextProject);
+      setSaveState("saved");
+      return;
+    }
     if (!isAuthenticated) {
       notify("Подключите кошелёк и подтвердите вход подписью, чтобы сохранить изменение.");
       return;
@@ -119,7 +126,7 @@ export default function Home() {
   }
 
   async function runScopeCheck() {
-    if (!isAuthenticated) {
+    if (!canEdit) {
       notify("Чтобы сохранить результат сравнения, войдите подписью подключённого кошелька.");
       return;
     }
@@ -155,7 +162,7 @@ export default function Home() {
       updatedAt: new Date().toISOString(),
     };
     persist(nextProject);
-    notify("Этап отмечен принятым в локальном демо. Транзакция в Solana не отправлялась.");
+    notify(isPublicPreview ? "Изменение видно только в этом предпросмотре; транзакция не отправлялась." : "Этап отмечен принятым в локальном демо. Транзакция в Solana не отправлялась.");
   }
 
   function saveChangeDraft() {
@@ -176,11 +183,11 @@ export default function Home() {
     };
     persist(nextProject);
     setShowDraft(false);
-    notify("Черновик сохранён локально. Для изменения объёма нужны подтверждения обеих сторон.");
+    notify(isPublicPreview ? "Черновик доступен только в этом предпросмотре и не сохраняется после обновления." : "Черновик сохранён локально. Для изменения объёма нужны подтверждения обеих сторон.");
   }
 
   function cancelChangeDraft() {
-    if (!project.changeRequest || !window.confirm("Удалить этот локальный черновик запроса?")) return;
+    if (!project.changeRequest || !window.confirm(isPublicPreview ? "Удалить черновик из этого предпросмотра?" : "Удалить этот локальный черновик запроса?")) return;
     const nextProject: DemoProject = {
       ...project,
       changeRequest: null,
@@ -203,12 +210,12 @@ export default function Home() {
     notify("Подсказка закрыта. Согласованный объём не изменён.");
   }
 
-  const saveLabel = saveState === "loading" ? "Загружаю…" : saveState === "saving" ? "Сохраняю…" : saveState === "error" ? "Нет соединения" : "Сохранено локально";
+  const saveLabel = saveState === "loading" ? "Загружаю…" : saveState === "saving" ? "Сохраняю…" : saveState === "error" ? "Нет соединения" : isPublicPreview ? "Демо · не сохраняется" : "Сохранено локально";
   const hasDraft = project.changeRequest !== null;
   const isSuggestionVisible = !hasDraft && !project.suggestionDismissed;
 
   if (saveState === "loading") {
-    return <div className="loading-screen" role="status"><span className="brand-mark">S</span><span>Загружаю проект и локальную историю…</span></div>;
+    return <div className="loading-screen" role="status"><span className="brand-mark">S</span><span>{isPublicPreview ? "Загружаю демо-проект…" : "Загружаю проект и локальную историю…"}</span></div>;
   }
 
   return (
@@ -219,7 +226,7 @@ export default function Home() {
         <nav className="side-nav" aria-label="Главная навигация">
           <button className="side-link active"><span className="side-glyph" aria-hidden="true">◫</span>Обзор проекта</button>
           <button className="side-link" onClick={() => notify("В демо доступен один проект")}><span className="side-glyph" aria-hidden="true">▤</span>Договорённости</button>
-          <button className="side-link" onClick={() => notify("История событий хранится локально в этом проекте")}><span className="side-glyph" aria-hidden="true">◷</span>История изменений</button>
+          <button className="side-link" onClick={() => notify(isPublicPreview ? "Это пример истории; новые события не сохраняются." : "История событий хранится локально в этом проекте")}><span className="side-glyph" aria-hidden="true">◷</span>История изменений</button>
         </nav>
         <div className="side-project"><div className="side-label">Текущий проект</div><div className="project-switcher"><span className="project-dot"/><span><strong>{project.title}</strong><small>2 участника · 3 этапа</small></span></div></div>
         <div className="sidebar-spacer"/><div className="help-card"><strong>Один источник правды</strong><p>Объём, запросы и приёмка собраны рядом — чтобы договорённости не терялись в переписке.</p></div>
@@ -229,7 +236,7 @@ export default function Home() {
       <div className="main-area">
         <header className="topbar">
           <div className="crumbs">Мои проекты <span aria-hidden="true"> / </span> <strong>{project.title}</strong></div>
-          <div className="top-actions"><span className="save-state" role="status" data-state={saveState}>{saveLabel}</span><span className="demo-badge">ЛОКАЛЬНЫЙ ДЕМО-ПРОЕКТ</span><ClusterSelect/><WalletAuthControl/><WalletButton/></div>
+          <div className="top-actions"><span className="save-state" role="status" data-state={saveState}>{saveLabel}</span><span className="demo-badge">{isPublicPreview ? "ПУБЛИЧНЫЙ ПРЕДПРОСМОТР" : "ЛОКАЛЬНЫЙ ДЕМО-ПРОЕКТ"}</span>{!isPublicPreview && <><ClusterSelect/><WalletAuthControl/><WalletButton/></>}</div>
         </header>
 
         <main className="workspace-content">
@@ -254,18 +261,18 @@ export default function Home() {
             <article className="panel section-panel">
               <div className="section-title-row"><div><h2>Критерии приёмки</h2><div className="section-subtitle">Список зафиксирован в согласованном объёме</div></div><span className="count-badge">{doneCount}/{project.criteria.length}</span></div>
               <div className="checklist">{project.criteria.map((criterion) => <div className={`check-row${criterion.checked ? " is-checked" : ""}`} key={criterion.id}>
-                <button className={`check-box${criterion.checked ? " checked" : ""}`} onClick={() => toggleCriterion(criterion.id)} disabled={!isAuthenticated} aria-label={`${criterion.checked ? "Отметить невыполненным" : "Отметить выполненным"}: ${criterion.title}`} aria-pressed={criterion.checked}>{criterion.checked ? "✓" : ""}</button>
+                <button className={`check-box${criterion.checked ? " checked" : ""}`} onClick={() => toggleCriterion(criterion.id)} disabled={!canEdit} aria-label={`${criterion.checked ? "Отметить невыполненным" : "Отметить выполненным"}: ${criterion.title}`} aria-pressed={criterion.checked}>{criterion.checked ? "✓" : ""}</button>
                 <div className="check-copy"><strong>{criterion.title}</strong><small>{criterion.detail}</small></div><span className="check-owner">{criterion.owner}</span>
               </div>)}</div>
-              <div className="acceptance-footer"><p>{isAuthenticated ? "Демо-приёмка сохраняется после подписи кошелька." : "Подключите кошелёк и войдите подписью, чтобы менять чек-лист и сохранять приёмку."}</p><button className="primary-button" onClick={acceptMilestone} disabled={!isAuthenticated || doneCount !== project.criteria.length || project.milestone.accepted}>{project.milestone.accepted ? "Этап принят ✓" : "Принять этап"}</button></div>
+              <div className="acceptance-footer"><p>{isPublicPreview ? "Изменения доступны только в этой вкладке и сбросятся после обновления." : isAuthenticated ? "Демо-приёмка сохраняется после подписи кошелька." : "Подключите кошелёк и войдите подписью, чтобы менять чек-лист и сохранять приёмку."}</p><button className="primary-button" onClick={acceptMilestone} disabled={!canEdit || doneCount !== project.criteria.length || project.milestone.accepted}>{project.milestone.accepted ? "Этап принят ✓" : "Принять этап"}</button></div>
             </article>
 
             <article className="panel change-card">
               <div className="change-head"><div className="ai-mark" aria-hidden="true">S</div><div className="change-head-copy"><strong>{hasDraft ? "Черновик запроса сохранён" : project.suggestionDismissed ? "Подсказка рассмотрена" : classificationLabel(analysis)}</strong><small>{hasDraft ? "Ожидает решения сторон" : "Сравнение с согласованным объёмом"}</small></div><span className="ai-badge">ПРАВИЛА · ДЕМО</span></div>
               <div className="change-body">
                 <label className="panel-label" htmlFor="incoming-message" style={{ display: "block", marginBottom: 8 }}>СООБЩЕНИЕ КЛИЕНТА</label>
-                <textarea id="incoming-message" className="message-input" value={incomingText} maxLength={1_000} onChange={(event) => setIncomingText(event.target.value)} aria-describedby="message-help" disabled={!isAuthenticated || hasDraft} />
-                <div className="message-tools"><span id="message-help">{!isAuthenticated ? "Войдите подписью кошелька, чтобы запускать сравнение" : hasDraft ? "Сначала удалите черновик, чтобы заменить сообщение" : `${incomingText.length}/1 000 символов · локальный анализ`}</span><button className="text-button" onClick={runScopeCheck} disabled={!isAuthenticated || analyzing || hasDraft}>{analyzing ? "Сравниваю…" : "Сравнить с объёмом"}</button></div>
+                <textarea id="incoming-message" className="message-input" value={incomingText} maxLength={1_000} onChange={(event) => setIncomingText(event.target.value)} aria-describedby="message-help" disabled={!canEdit || hasDraft} />
+                <div className="message-tools"><span id="message-help">{!canEdit ? "Войдите подписью кошелька, чтобы запускать сравнение" : hasDraft ? "Сначала удалите черновик, чтобы заменить сообщение" : `${incomingText.length}/1 000 символов · ${isPublicPreview ? "анализ без сохранения" : "локальный анализ"}`}</span><button className="text-button" onClick={runScopeCheck} disabled={!canEdit || analyzing || hasDraft}>{analyzing ? "Сравниваю…" : "Сравнить с объёмом"}</button></div>
                 {analysisError && <p className="inline-error" role="alert">{analysisError}</p>}
                 {analysis && <div className="assessment" data-classification={analysis.classification} aria-live="polite">
                   <div className="assessment-title"><span className="assessment-dot"/><strong>{classificationLabel(analysis)}</strong><span>{analysis.confidence === "medium" ? "средняя уверенность" : "низкая уверенность"}</span></div>
@@ -277,9 +284,9 @@ export default function Home() {
                 {hasDraft ? <>
                   <div className="accepted-state"><span>◷</span><span><strong>{project.changeRequest?.title}</strong><br/>{project.changeRequest?.description}<br/>Черновик не меняет объём, цену или срок до подтверждения обеих сторон.</span></div>
                   <p className="advisory-note">Текущий демо-аккаунт не подтверждает личность участников; реальные взаимные approvals добавим вместе с авторизацией.</p>
-                  <button className="text-button draft-cancel" onClick={cancelChangeDraft} disabled={!isAuthenticated}>Удалить черновик</button>
+                  <button className="text-button draft-cancel" onClick={cancelChangeDraft} disabled={!canEdit}>Удалить черновик</button>
                 </> : project.suggestionDismissed ? <div className="accepted-state"><span>✓</span><span>Вы закрыли подсказку. Согласованный объём не изменён.</span></div> : analysis && <>
-                  <div className="change-actions"><button className="primary-button" onClick={() => { setDraftDescription(analysis.requestExcerpt); setShowDraft(true); }} disabled={!isAuthenticated}>Создать запрос</button><button className="secondary-button" onClick={dismissSuggestion} disabled={!isAuthenticated}>Закрыть подсказку</button></div>
+                  <div className="change-actions"><button className="primary-button" onClick={() => { setDraftDescription(analysis.requestExcerpt); setShowDraft(true); }} disabled={!canEdit}>Создать запрос</button><button className="secondary-button" onClick={dismissSuggestion} disabled={!canEdit}>Закрыть подсказку</button></div>
                   <p className="advisory-note">Это упрощённые правила, не подключённая языковая модель. Подсказка не решает, входит ли работа в объём.</p>
                 </>}
               </div>
@@ -287,10 +294,10 @@ export default function Home() {
           </section>
 
           <section className="panel section-panel history-panel">
-            <div className="section-title-row"><div><h2>Недавняя активность</h2><div className="section-subtitle">События сохраняются в локальной истории</div></div><span className="panel-label">LOCAL DEMO</span></div>
+            <div className="section-title-row"><div><h2>Недавняя активность</h2><div className="section-subtitle">{isPublicPreview ? "Пример истории; новые события видны только до обновления" : "События сохраняются в локальной истории"}</div></div><span className="panel-label">LOCAL DEMO</span></div>
             <div className="activity-list">{project.activity.slice(0, 5).map((item) => <div className="activity-item" key={item.id}><span className="activity-marker">•</span><p><strong>{item.actor}</strong> {item.action}</p><time>{item.dateLabel}</time></div>)}</div>
           </section>
-          <p className="advisory-note" style={{ marginTop: 16 }}>Локальный прототип: состояние сохраняется в JSON-файл на этой машине. {authenticatedAddress ? `Текущая демо-сессия: ${authenticatedAddress.slice(0, 4)}…${authenticatedAddress.slice(-4)}.` : "Вход подтверждается подписью кошелька без транзакции."} Данные не отправляются в GitHub; общая база и транзакции Solana пока не подключены.</p>
+          <p className="advisory-note" style={{ marginTop: 16 }}>{isPublicPreview ? "Публичный preview: изменения видны только в текущей вкладке и сбросятся после обновления. Текст сообщения отправляется в API приложения для rule-based сравнения, но не сохраняется в базе. Не вводите приватные переписки." : `Локальный прототип: состояние сохраняется в JSON-файл на этой машине. ${authenticatedAddress ? `Текущая демо-сессия: ${authenticatedAddress.slice(0, 4)}…${authenticatedAddress.slice(-4)}.` : "Вход подтверждается подписью кошелька без транзакции."} Общая база и транзакции Solana пока не подключены.`}</p>
         </main>
       </div>
 
@@ -298,7 +305,7 @@ export default function Home() {
         <section role="dialog" aria-modal="true" aria-labelledby="draft-title" className="panel draft-dialog">
           <div className="eyebrow">НОВЫЙ ЗАПРОС · ЧЕРНОВИК</div><h2 id="draft-title">Предложить изменение</h2><p className="muted-copy">Запрос фиксирует предложение, но не меняет объём и цену автоматически.</p>
           <label htmlFor="change-description" className="panel-label">ОПИСАНИЕ ИЗМЕНЕНИЯ</label><textarea id="change-description" value={draftDescription} maxLength={1_000} onChange={(event) => setDraftDescription(event.target.value)} />
-          <div className="dialog-actions"><button className="secondary-button" onClick={() => setShowDraft(false)}>Отмена</button><button className="primary-button" onClick={saveChangeDraft} disabled={!isAuthenticated || !draftDescription.trim()}>Сохранить черновик</button></div>
+          <div className="dialog-actions"><button className="secondary-button" onClick={() => setShowDraft(false)}>Отмена</button><button className="primary-button" onClick={saveChangeDraft} disabled={!canEdit || !draftDescription.trim()}>Сохранить черновик</button></div>
         </section>
       </div>}
       {toast && <div className="toast-message" role="status">{toast}</div>}
