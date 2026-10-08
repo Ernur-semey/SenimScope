@@ -1,44 +1,126 @@
-# SenimScope
+# SenimScope — Agreements Without the Guesswork
 
-**SenimScope — AI-помощник для согласования объёма, изменений и приёмки этапов фриланс-проектов.**
+> An AI-assisted workspace for freelancers and clients to agree on project scope, review new requests, and accept milestones—with people in control of every decision.
 
-The prototype helps a client and freelancer keep the agreed scope, acceptance checklist, and proposed scope changes together. AI is an assistant: it can flag a possible mismatch, but it does not decide what is in scope or release money.
+[Product brief](docs/PRODUCT_SPEC.md) · [Architecture](docs/ARCHITECTURE.md) · [Brand guide](brand.md)
 
-## Run locally
+---
 
-Requires Node.js 24 or newer.
+## The Problem
+
+Freelance projects often begin with an informal brief and evolve in chat. A small request can quietly become extra work, while both sides remember the original agreement differently.
+
+SenimScope keeps the agreed deliverables, acceptance criteria, and proposed changes together. It helps both participants see what changed and make the decision themselves.
+
+## How It Works
+
+1. **Agree on the scope** — capture deliverables and milestone acceptance criteria.
+2. **Compare a new request** — SenimScope highlights the message and scope items that may be related.
+3. **Discuss the change** — turn a possible scope change into a draft request for both sides to review.
+4. **Review the milestone** — check work against the agreed criteria before recording acceptance.
+
+AI is an assistant, not an arbiter. It cannot change scope, accept work, set a price, or move funds.
+
+---
+
+## Why Solana
+
+Wallet identity gives participants a familiar way to prove control of an address. As the product develops, Solana can provide a verifiable record of agreed scope versions and milestone decisions, while briefs and private messages stay off-chain.
+
+The current prototype connects to a devnet wallet and uses a signed message for local sign-in. It submits no Solana transactions and does not store project agreements on-chain.
+
+---
+
+## What Works Today
+
+- Review a sample freelance project and its milestone checklist.
+- Sign in by signing a one-time wallet message; no transaction is requested.
+- Compare a sample client message with scope items using a transparent, deterministic rules demo.
+- See the excerpts and scope references behind a suggestion.
+- Save a change-request draft and update the local project state.
+
+This is an early, single-machine prototype. The scope checker is not connected to an LLM. Wallet sign-in proves control of an address but does not assign client or freelancer roles. Local demo routes are disabled in production.
+
+---
+
+## Architecture
+
+```text
+┌─────────────────────────────┐
+│ Next.js project workspace   │
+│ scope · checklist · drafts  │
+└──────────────┬──────────────┘
+               │ local API routes
+       ┌───────┴────────┐
+       ▼                ▼
+┌──────────────┐  ┌─────────────────────┐
+│ Local JSON   │  │ Rules-based scope   │
+│ project store│  │ comparison + evidence│
+└──────────────┘  └─────────────────────┘
+
+Wallet Standard + Solana Kit
+  └─ devnet connection and signed-message sign-in
+     (no transaction flow in this prototype)
+```
+
+The local project snapshot is stored in `.local-data/senimscope-demo.json`, which is ignored by Git. Sessions live in server memory and expire after eight hours or when the development server restarts. See the [architecture notes](docs/ARCHITECTURE.md) for the next implementation stages.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+| --- | --- |
+| Web app | Next.js App Router · React · TypeScript |
+| UI | Tailwind CSS v4 |
+| Wallet | Solana Kit · Wallet Standard |
+| Demo persistence | Local JSON through Next.js Route Handlers |
+| Scope comparison | Deterministic rules demo with evidence references |
+| Network | Solana devnet wallet connection; no on-chain writes yet |
+
+---
+
+## Run Locally
+
+**Requirements:** Node.js 24+ and pnpm.
 
 ```bash
+git clone https://github.com/Ernur-semey/SenimScope.git
+cd SenimScope
 pnpm install
 pnpm dev
 ```
 
-Open http://localhost:3000. The wallet controls use the Solana Foundation Kit + Wallet Standard starter and default to devnet. Sign in with the connected wallet before changing the demo project. Sign-in verifies a one-time message signature and does not submit a transaction.
+Open [http://localhost:3000](http://localhost:3000). Connect a Wallet Standard-compatible wallet, then choose **Войти подписью** to enable local project changes. The sign-in message is not a transaction.
 
-## Current demo flow
+To create a production build locally:
 
-1. Review the agreed milestone and its acceptance checklist.
-2. Sign in with the connected wallet, then toggle checklist items; acceptance becomes available once all criteria are complete.
-3. Review an AI-style scope-change suggestion based on a client message.
-4. Save a change request draft. It remains unapproved until both parties agree.
+```bash
+pnpm build
+```
 
-The workspace saves one demo project to `.local-data/senimscope-demo.json` through local-only Next.js route handlers. Checklist changes, milestone acceptance, dismissed suggestions, and change-request drafts survive a page refresh. This file is ignored by Git. Mutations require a wallet-signature session: the server verifies an expiring, one-time challenge and sets an HttpOnly cookie. The session lasts up to eight hours and is held in server memory, so restarting the dev server signs the user out. This proves control of the wallet address only; project roles are not assigned or checked yet. The app uses a transparent deterministic rules demo to compare the sample message with scope items; no external LLM or database is connected.
+The local demo API is intentionally unavailable in production mode; this prototype is not ready for multi-user or production use.
 
-Local API routes are disabled in production builds. The JSON store is a development adapter for this single-machine prototype, not a multi-user database or a production persistence layer.
+---
 
-## Product and architecture
+## Roadmap
 
-- [Product brief](docs/PRODUCT_SPEC.md)
-- [Architecture and next steps](docs/ARCHITECTURE.md)
-- [Brand guide](brand.md)
+- [x] Local project workspace with milestone checklist and change-request drafts
+- [x] Wallet-signed local session for project mutations
+- [x] Explainable, deterministic scope comparison demo
+- [ ] Shared project storage and explicit client/freelancer roles
+- [ ] Evaluate an LLM scope assistant against a reviewed dataset
+- [ ] Add mutual approval and version history
+- [ ] Prototype a devnet program for scope hashes and project lifecycle events
 
-## Stack
+See the [product brief](docs/PRODUCT_SPEC.md) and [architecture plan](docs/ARCHITECTURE.md) for details.
 
-- Next.js App Router, React, TypeScript, Tailwind CSS v4
-- Official Solana Foundation Kit/Next.js starter, updated to Kit v8, for wallet discovery and devnet selection
-- `@solana/kit` + `@solana/react` for future on-chain interactions
-- Ivory Linen brand palette, Inter + JetBrains Mono
+---
 
-## Safety boundary for the hackathon MVP
+## Safety Boundaries
 
-Keep the demo on devnet. Local wallet sign-in authenticates control of an address, but does not establish a client/freelancer role or authorize party-specific approvals. Do not present UI acceptance as an on-chain escrow action. Before handling real funds, define a legal and operational model for the project jurisdictions, obtain an independent program review, and specify dispute and refund paths.
+- Keep the prototype on devnet.
+- Keep private briefs and messages off-chain.
+- Treat scope suggestions as advisory and show the evidence behind them.
+- Do not present UI acceptance as an on-chain approval or escrow action.
+- Do not handle real funds until the product has a reviewed security, dispute, refund, and operating model.
